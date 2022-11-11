@@ -8,37 +8,35 @@ public class main {
 
     public static void main(String... A)
     {
-        String expressionText = "2 * 2 / 2 * 2";
+        String expressionText;
         Scanner in = new Scanner(System.in);
         expressionText = in.nextLine();
-        List<Lexeme> lexemes = lexAnalyze(expressionText);
+        List<Lexeme> lexemes = lexeme_parsing(expressionText);//Парсим строку на символы
         LexemeBuffer lexemeBuffer = new LexemeBuffer(lexemes);
-        System.out.println(expr(lexemeBuffer));
+        System.out.println(expr(lexemeBuffer));//Считаем выражение
     }
 
-    public enum LexemeType {
-        LEFT_BRACKET, RIGHT_BRACKET,
-        OP_PLUS, OP_MINUS, OP_MUL, OP_DIV,
-        NUMBER,
-        EOF;
+    public enum LexemeValue //Типы значений которые могут встретиться в выражении
+    {
+        l_bracket, r_bracket, plus, minus, mult, div, number, EOF;
     }
 
 
     public static class Lexeme {
-        LexemeType type;
+        LexemeValue type;
         String value;
 
-        public Lexeme(LexemeType type, String value) {
+        public Lexeme(LexemeValue type, String value) {
             this.type = type;
             this.value = value;
-        }
+        }//Конструктор
 
-        public Lexeme(LexemeType type, Character value) {
+        public Lexeme(LexemeValue type, Character value) {
             this.type = type;
             this.value = value.toString();
-        }
+        }//Конструктор если строка задается через char
 
-        @Override
+        @Override//перегружаем toString для вывода
         public String toString() {
             return "Lexeme{" +
                     "type=" + type +
@@ -47,9 +45,9 @@ public class main {
         }
     }
     public static class LexemeBuffer {
-        private int pos;
+        private int pos;//позиция в строке лексем
 
-        public List<Lexeme> lexemes;
+        public List<Lexeme> lexemes;// все распарсенные лексемы
 
         public LexemeBuffer(List<Lexeme> lexemes) {
             this.lexemes = lexemes;
@@ -68,63 +66,72 @@ public class main {
         }
     }
 
-    public static List<Lexeme> lexAnalyze(String expText) {
+    public static List<Lexeme> lexeme_parsing(String expText) {//собственно сам парсинг
         ArrayList<Lexeme> lexemes = new ArrayList<>();
         int pos = 0;
         while (pos< expText.length()) {
             char c = expText.charAt(pos);
             switch (c) {
                 case '(':
-                    lexemes.add(new Lexeme(LexemeType.LEFT_BRACKET, c));
+                    lexemes.add(new Lexeme(LexemeValue.l_bracket, c));
                     pos++;
                     continue;
                 case ')':
-                    lexemes.add(new Lexeme(LexemeType.RIGHT_BRACKET, c));
+                    lexemes.add(new Lexeme(LexemeValue.r_bracket, c));
                     pos++;
                     continue;
                 case '+':
-                    lexemes.add(new Lexeme(LexemeType.OP_PLUS, c));
+                    lexemes.add(new Lexeme(LexemeValue.plus, c));
                     pos++;
                     continue;
                 case '-':
-                    lexemes.add(new Lexeme(LexemeType.OP_MINUS, c));
+                    lexemes.add(new Lexeme(LexemeValue.minus, c));
                     pos++;
                     continue;
                 case '*':
-                    lexemes.add(new Lexeme(LexemeType.OP_MUL, c));
+                    lexemes.add(new Lexeme(LexemeValue.mult, c));
                     pos++;
                     continue;
                 case '/':
-                    lexemes.add(new Lexeme(LexemeType.OP_DIV, c));
+                    lexemes.add(new Lexeme(LexemeValue.div, c));
                     pos++;
                     continue;
                 default:
-                    if (c <= '9' && c >= '0') {
-                        StringBuilder sb = new StringBuilder();
+                    if (c <= '9' && c >= '0') {//вводим число как последовательность цифр
+                        StringBuilder number_ = new StringBuilder();
                         do {
-                            sb.append(c);
+                            number_.append(c);
                             pos++;
                             if (pos >= expText.length()) {
                                 break;
                             }
                             c = expText.charAt(pos);
                         } while (c <= '9' && c >= '0');
-                        lexemes.add(new Lexeme(LexemeType.NUMBER, sb.toString()));
+                        lexemes.add(new Lexeme(LexemeValue.number, number_.toString()));
                     } else {
                         if (c != ' ') {
-                            throw new RuntimeException("Unexpected character: " + c);
+                            throw new RuntimeException("Непонятный символ: " + c);
                         }
                         pos++;
                     }
             }
         }
-        lexemes.add(new Lexeme(LexemeType.EOF, ""));
+        lexemes.add(new Lexeme(LexemeValue.EOF, ""));
         return lexemes;
     }
 
+    //Вот такая идея решения
+    //Спукаемся запуская expr в нем находим plusminus в нем находим если есть multdiv а в нем если есть brackets and numbers и
+    //expr(plusminus)
+    //plusminus(multdiv)
+    //multdiv(brackets and numbers)
+    //brackets and numbers
+
+
+
     public static int expr(LexemeBuffer lexemes) {
         Lexeme lexeme = lexemes.next();
-        if (lexeme.type == LexemeType.EOF) {
+        if (lexeme.type == LexemeValue.EOF) {
             return 0;
         } else {
             lexemes.back();
@@ -137,63 +144,63 @@ public class main {
         while (true) {
             Lexeme lexeme = lexemes.next();
             switch (lexeme.type) {
-                case OP_PLUS:
+                case plus:
                     value += multdiv(lexemes);
                     break;
-                case OP_MINUS:
+                case minus:
                     value -= multdiv(lexemes);
                     break;
                 case EOF:
-                case RIGHT_BRACKET:
+                case r_bracket:
                     lexemes.back();
                     return value;
                 default:
-                    throw new RuntimeException("Unexpected token: " + lexeme.value
-                            + " at position: " + lexemes.getPos());
+                    throw new RuntimeException("Непонятое значение " + lexeme.value
+                            + " на позиции " + lexemes.getPos());
             }
         }
     }
 
     public static int multdiv(LexemeBuffer lexemes) {
-        int value = factor(lexemes);
+        int value = brackets_and_numbers(lexemes);
         while (true) {
             Lexeme lexeme = lexemes.next();
             switch (lexeme.type) {
-                case OP_MUL:
-                    value *= factor(lexemes);
+                case mult:
+                    value *= brackets_and_numbers(lexemes);
                     break;
-                case OP_DIV:
-                    value /= factor(lexemes);
+                case div:
+                    value /= brackets_and_numbers(lexemes);
                     break;
                 case EOF:
-                case RIGHT_BRACKET:
-                case OP_PLUS:
-                case OP_MINUS:
+                case r_bracket:
+                case plus:
+                case minus:
                     lexemes.back();
                     return value;
                 default:
-                    throw new RuntimeException("Unexpected token: " + lexeme.value
-                            + " at position: " + lexemes.getPos());
+                    throw new RuntimeException("Непонятое значение  " + lexeme.value
+                            + " на позиции: " + lexemes.getPos());
             }
         }
     }
 
-    public static int factor(LexemeBuffer lexemes) {
+    public static int brackets_and_numbers(LexemeBuffer lexemes) {
         Lexeme lexeme = lexemes.next();
         switch (lexeme.type) {
-            case NUMBER:
+            case number:
                 return Integer.parseInt(lexeme.value);
-            case LEFT_BRACKET:
+            case l_bracket:
                 int value = plusminus(lexemes);
                 lexeme = lexemes.next();
-                if (lexeme.type != LexemeType.RIGHT_BRACKET) {
-                    throw new RuntimeException("Unexpected token: " + lexeme.value
-                            + " at position: " + lexemes.getPos());
+                if (lexeme.type != LexemeValue.r_bracket) {
+                    throw new RuntimeException("Непонятое значение: " + lexeme.value
+                            + " на позиции: " + lexemes.getPos());
                 }
                 return value;
             default:
-                throw new RuntimeException("Unexpected token: " + lexeme.value
-                        + " at position: " + lexemes.getPos());
+                throw new RuntimeException("Непонятое значение: " + lexeme.value
+                        + " на позиции: " + lexemes.getPos());
         }
     }
 
